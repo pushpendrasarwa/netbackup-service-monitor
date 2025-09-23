@@ -21,7 +21,7 @@ if [ -f $LOG_FILE ]; then
                 echo "$(date):::: New Log File has been created. " >> $LOG_FILE
 
         else
-                echo "$(date):::: File Size Checked and it is within the limit" >> $LOG_FILE
+                echo "$(date):::: Log File Size Checked and it is within the limit" >> $LOG_FILE
 
         fi
 
@@ -33,21 +33,24 @@ else
 fi
 
 #List of daemons running on the master server
-masters="bpdbm bpjobd nbstserv nbpem nbsvcmon bprd nbim  vnetd nbrmms pbx_exchange bpcd nbsl nbemm NB_dbsrv nbars nbrb nbevtmgr bpcompatd nbaudit nbvault nbjm"
+#masters="bpdbm bpjobd nbstserv nbpem nbsvcmon bprd nbim  vnetd nbrmms pbx_exchange bpcd nbsl nbemm NB_dbsrv nbars nbrb nbevtmgr bpcompatd nbaudit nbvault nbjm"
+masters="nbevtmgr nbstserv vmd bprd bpdbm nbpem nbjm"
 
 # Get output of bpps -x
-echo "$(date):::: Fetching status of the services." >> $LOG_FILE
+echo "\n$(date):::: Fetching status of the services." >> $LOG_FILE
+$null>/usr/openv/netbackup/hc_auto_script/processes
+sleep 1
 /usr/openv/netbackup/bin/bpps -x > /usr/openv/netbackup/hc_auto_script/processes
 
 # Flag to indicate restart is needed
 restart_needed=false
 
-EMAIL_TO="pushpendra.sarwa.osv@fedex.com"
-EMAIL_SUBJECT1="NetBackup Service Alert on $(hostname)"
+EMAIL_TO="Accenture-Backup-LAC@corp.ds.fedex.com"
+EMAIL_SUBJECT1="NetBackup Service Status on $(hostname)"
 #EMAIL_SUBJECT2="Auto-Restart Success | NetBackup Service Alert on $(hostname)"
 send_alert() {
         local service = $1
-        echo -e "Date: $(date) \n\nAlert: NetBackup Services are found to be down on $(hostname)\n #bpps-x: \n$(tail -n 8 "$LOG_FILE")" | mail -s "$EMAIL_SUBJECT1"  "$EMAIL_TO"
+        echo -e "Date: $(date) \n\nAlert: NetBackup Service $service found to be down on $(hostname)\n #bpps-x: \n$(tail -n 50 "$LOG_FILE")" | mail -s "$EMAIL_SUBJECT1"  "$EMAIL_TO"
 }
 # Parse output
 for master in ${masters}
@@ -57,9 +60,10 @@ for master in ${masters}
                 then
                         echo "$(date): Detected NetBackup service: $master is not running. " >> "$LOG_FILE"
                         restart_needed=true
+                        send_alert $master
                         break
                 else
-                        echo "$(date): Detected NetBackup service: $master is running. " >> "$LOG_FILE"
+                        echo "$(date): NetBackup service: $master is in running state. " >> "$LOG_FILE"
                         restart_needed=false
                 fi
         done
@@ -78,13 +82,17 @@ if $restart_needed; then
 
     sleep 5
 
-    # Step 2: Start PBX
-    /opt/VRTSpbx/bin/vpbx_exchange start >> "$LOG_FILE" 2>&1
+    # Step 2: Stop and Start PBX
+        /opt/VRTSpbx/bin/vxpbx_exchanged stop >> "$LOG_FILE" 2>&1
+
+        sleep 5
+
+        /opt/VRTSpbx/bin/vxpbx_exchanged start >> "$LOG_FILE" 2>&1
 
     sleep 5
 
     # Step 3: Start all NetBackup daemons
-    /usr/openv/netbackup/bin/bp.startall >> "$LOG_FILE" 2>&1
+    /usr/openv/netbackup/bin/bp.start_all >> "$LOG_FILE" 2>&1
 
      echo "$(date): NetBackup service restart completed." >> "$LOG_FILE"
 
@@ -92,6 +100,7 @@ if $restart_needed; then
 
 else
     echo "$(date): All critical NetBackup services are running normally." >> "$LOG_FILE"
+    echo -e "Date: $(date) \n\nAlert: All NetBackup Services are found to be up and running on $(hostname)\n \n$(tail -n 10 "$LOG_FILE")" | mail -s "$EMAIL_SUBJECT1"  "$EMAIL_TO"
 
 fi
 
