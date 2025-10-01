@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 # File to log activities
@@ -10,7 +9,7 @@ if [ -f $LOG_FILE ]; then
         FILE_SIZE=$(du -m $LOG_FILE | awk '{print $1}')
 
         if [ $FILE_SIZE -ge $MAX_SIZE ]; then
-                echo "\n $(date):::: Log File Size has reached maximum size. Hence Rotating the Log." >> $LOG_FILE
+                echo "\n$(date):::: Log File Size has reached maximum size. Hence Rotating the Log." >> $LOG_FILE
 
                 ROTATED_LOG = "${LOG_FILE}.${DATE_SUFFIX}"
                 mv "$LOG_FILE" "$ROTATED_LOG"
@@ -37,20 +36,21 @@ fi
 masters="nbevtmgr nbstserv vmd bprd bpdbm nbpem nbjm"
 
 # Get output of bpps -x
-echo "\n$(date):::: Fetching status of the services." >> $LOG_FILE
+echo "\n||$(date):::: Fetching status of the services.||" >> $LOG_FILE
 $null>/usr/openv/netbackup/hc_auto_script/processes
 sleep 1
 /usr/openv/netbackup/bin/bpps -x > /usr/openv/netbackup/hc_auto_script/processes
 
 # Flag to indicate restart is needed
 restart_needed=false
+impacted_service=$null
 
 EMAIL_TO="Accenture-Backup-LAC@corp.ds.fedex.com"
 EMAIL_SUBJECT1="NetBackup Service Status on $(hostname)"
-#EMAIL_SUBJECT2="Auto-Restart Success | NetBackup Service Alert on $(hostname)"
+#EMAIL_SUBJECT2="Auto-Restart Success | NetBackup Service Status on $(hostname)"
 send_alert() {
         local service = $1
-        echo -e "Date: $(date) \n\nAlert: NetBackup Service $service found to be down on $(hostname)\n #bpps-x: \n$(tail -n 50 "$LOG_FILE")" | mail -s "$EMAIL_SUBJECT1"  "$EMAIL_TO"
+        echo -e "Date: $(date) \n\nAlert: NetBackup Service $service found to be down on $(hostname)\n #bpps-x: \n$(tail -n 50 "$LOG_FILE")" | mail -s "$service Found Down | Auto Restarting on Netbackup Server $(hostname)"  "$EMAIL_TO"
 }
 # Parse output
 for master in ${masters}
@@ -60,7 +60,8 @@ for master in ${masters}
                 then
                         echo "$(date): Detected NetBackup service: $master is not running. " >> "$LOG_FILE"
                         restart_needed=true
-                        send_alert $master
+                        impacted_service=$master
+                        #send_alert $master
                         break
                 else
                         echo "$(date): NetBackup service: $master is in running state. " >> "$LOG_FILE"
@@ -96,11 +97,10 @@ if $restart_needed; then
 
      echo "$(date): NetBackup service restart completed." >> "$LOG_FILE"
 
-         send_alert
+         send_alert $impacted_service
 
 else
     echo "$(date): All critical NetBackup services are running normally." >> "$LOG_FILE"
-    echo -e "Date: $(date) \n\nAlert: All NetBackup Services are found to be up and running on $(hostname)\n \n$(tail -n 10 "$LOG_FILE")" | mail -s "$EMAIL_SUBJECT1"  "$EMAIL_TO"
+    echo -e "Date: $(date) \nAll NetBackup Services are found to be up and running on $(hostname)\n \n$(tail -n 10 "$LOG_FILE")" | mail -s "$EMAIL_SUBJECT1"  "$EMAIL_TO"
 
 fi
-
