@@ -50,7 +50,7 @@ EMAIL_SUBJECT1="NetBackup Service Status on $(hostname)"
 #EMAIL_SUBJECT2="Auto-Restart Success | NetBackup Service Status on $(hostname)"
 send_alert() {
         local service = $1
-        echo -e "Date: $(date) \n\nAlert: NetBackup Service $service found to be down on $(hostname)\n #bpps-x: \n$(tail -n 50 "$LOG_FILE")" | mail -s "$service Found Down | Auto Restarting on Netbackup Server $(hostname)"  "$EMAIL_TO"
+        echo -e "Date: $(date) \n\nAlert: NetBackup Service $service found to be down on $(hostname)\n $(tail -n 100 "$LOG_FILE")" | mail -s "Service $service Found Down | Auto Restarting on Netbackup Server $(hostname)"  "$EMAIL_TO"
 }
 # Parse output
 for master in ${masters}
@@ -71,10 +71,6 @@ for master in ${masters}
 
 # If any of the critical master process is not running, restart NetBackup
 if $restart_needed; then
-#    echo "$(date): Detected NetBackup services not running. Affected processes:" >> "$LOG_FILE"
-#    for idx in "${!process_names[@]}"; do
-#        echo " - ${process_names[$idx]}: ${process_statuses[$idx]}" >> "$LOG_FILE"
-#    done
 
     echo "$(date): Initiating NetBackup service restart..." >> "$LOG_FILE"
 
@@ -84,11 +80,11 @@ if $restart_needed; then
     sleep 5
 
     # Step 2: Stop and Start PBX
-        /opt/VRTSpbx/bin/vxpbx_exchanged stop >> "$LOG_FILE" 2>&1
+     /opt/VRTSpbx/bin/vxpbx_exchanged stop >> "$LOG_FILE" 2>&1
 
-        sleep 5
+     sleep 5
 
-        /opt/VRTSpbx/bin/vxpbx_exchanged start >> "$LOG_FILE" 2>&1
+     /opt/VRTSpbx/bin/vxpbx_exchanged start >> "$LOG_FILE" 2>&1
 
     sleep 5
 
